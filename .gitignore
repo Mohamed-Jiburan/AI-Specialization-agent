@@ -1,0 +1,66 @@
+# === OS / Editor ===
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# VS Code / JetBrains
+.vscode/
+.idea/
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# === Frontend (Node / Vite / React) ===
+node_modules/
+dist/
+build/
+.vite/
+
+# Local env files (keep secrets out of git)
+.env
+.env.*
+!.env.example
+
+# === Backend (Python / FastAPI) ===
+__pycache__/
+*.py[cod]
+*.pyd
+*.pyo
+*.pdb
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+
+# Python tooling caches
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.pytype/
+
+# Coverage
+.coverage
+coverage.xml
+htmlcov/
+
+# Uvicorn / FastAPI reload artifacts
+*.pid
+
+# Jupyter
+.ipynb_checkpoints/
+
+# === Git ===
+*.orig
+
+# === Local DB / uploads (if any) ===
+*.sqlite3
+*.db
+
+# === Windows Python build artifacts ===
+*.egg-info/
+.eggs/
