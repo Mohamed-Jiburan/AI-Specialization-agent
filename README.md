@@ -2,14 +2,13 @@
 AI Specialization Pro is a full-stack career decision agent that analyzes a user’s AI profile, ranks best-fit roles with explainability, generates a personalized roadmap + SWOT analysis, supports role comparison, and exports roadmaps as a PDF. Built with React + Tailwind and FastAPI with optional Groq LLM narratives.
 
 
-AI Specialization Pro
+**AI Specialization Pro**
 
 AI Specialization Pro is a full-stack AI career decision agent that helps users choose the best AI role based on their skills and preferences, explains why those roles fit, generates a personalized 6-month roadmap, provides a SWOT analysis per role, supports role comparison, and exports roadmaps as a PDF.
 
 
-============================================================
-Demo Highlights
-============================================================
+**Demo Highlights**
+
 - Profile onboarding -> analysis
 - Ranked AI roles (agent-ordered)
 - Explainability (reasoning points + factor trace)
@@ -19,9 +18,8 @@ Demo Highlights
 - Roadmap PDF download
 
 
-============================================================
-Tech Stack
-============================================================
+**Tech Stack**
+
 Frontend
 - React (Vite)
 - TailwindCSS
@@ -35,9 +33,9 @@ Backend
 - Optional Groq LLM (OpenAI-compatible) for narrative/explainability enrichment
 
 
-============================================================
-How It Works (High-Level)
-============================================================
+
+**How It Works (High-Level)**
+
 1) User submits profile:
    - skills, interests, goal
    - experience level (Beginner / Intermediate / Advanced)
@@ -51,10 +49,8 @@ How It Works (High-Level)
 
 Note: The ranking/scoring is deterministic for consistency; the LLM is used to improve readability and user experience.
 
+**Project Structure**
 
-============================================================
-Project Structure
-============================================================
 .
 |-- src/                    # React frontend
 |-- backend/                # FastAPI backend
@@ -67,9 +63,9 @@ Project Structure
 |   |-- requirements.txt
 
 
-============================================================
-Setup & Run (Local)
-============================================================
+
+**Setup & Run (Local)**
+
 Backend (FastAPI)
 From the repo root:
 
@@ -92,9 +88,9 @@ Frontend runs on:
   http://localhost:5173
 
 
-============================================================
-Environment Variables
-============================================================
+
+**Environment Variables**
+
 Frontend
 Create .env (optional):
 
@@ -111,9 +107,9 @@ If GROQ_API_KEY is not set:
 - narratives/reasoning points fall back to deterministic text
 
 
-============================================================
-Key API Endpoints
-============================================================
+
+**Key API Endpoints**
+
 - POST /auth/signup
 - POST /auth/login
 - GET  /careers
@@ -125,9 +121,8 @@ Key API Endpoints
 
 
 
-============================================================
-Roadmap / Future Improvements
-============================================================
+**Roadmap / Future Improvements**
+
 - Add real market datasets (salary, demand, growth by region)
 - Expand the role catalog beyond the current curated set
 - Track user learning progress and update recommendations over time
