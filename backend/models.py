@@ -25,6 +25,33 @@ class UserPublic(BaseModel):
     email: EmailStr
 
 
+class UserMeResponse(BaseModel):
+    id: int
+    email: EmailStr
+    role: Literal["USER", "ADMIN"] = "USER"
+    status: Literal["ACTIVE", "DISABLED"] = "ACTIVE"
+
+
+class AdminStatsResponse(BaseModel):
+    total_users: int = 0
+    total_goals: int = 0
+    system_health: str = "OK"
+
+
+class AdminUserRow(BaseModel):
+    id: int
+    email: EmailStr
+    role: Literal["USER", "ADMIN"] = "USER"
+    subscription: str = "FREE"
+    status: Literal["ACTIVE", "DISABLED"] = "ACTIVE"
+    joined_at: str = ""
+
+
+class AdminUserUpdateRequest(BaseModel):
+    role: Optional[Literal["USER", "ADMIN"]] = None
+    status: Optional[Literal["ACTIVE", "DISABLED"]] = None
+
+
 ExperienceLevel = Literal["Beginner", "Intermediate", "Advanced"]
 
 

@@ -39,6 +39,34 @@ def _init_db() -> None:
             )
             """
         )
+
+        # Lightweight migrations (add columns if missing)
+        cols = [r["name"] for r in conn.execute("PRAGMA table_info(users)").fetchall()]
+        if "role" not in cols:
+            conn.execute("ALTER TABLE users ADD COLUMN role TEXT NOT NULL DEFAULT 'USER'")
+        if "status" not in cols:
+            conn.execute("ALTER TABLE users ADD COLUMN status TEXT NOT NULL DEFAULT 'ACTIVE'")
+        if "created_at" not in cols:
+            conn.execute("ALTER TABLE users ADD COLUMN created_at TEXT")
+
+        # Backfill created_at for existing users (SQLite cannot add a column with non-constant default)
+        conn.execute("UPDATE users SET created_at = datetime('now') WHERE created_at IS NULL OR created_at = ''")
+
+        # Bootstrap: ensure admin user exists and has ADMIN role + configured password
+        admin_email = _admin_email()
+        admin_pw_hash = _hash_password(_admin_password())
+        cur = conn.execute("SELECT id FROM users WHERE lower(email) = ?", (admin_email,))
+        existing = cur.fetchone()
+        if existing is None:
+            conn.execute(
+                "INSERT INTO users (email, password_hash, role, status, created_at) VALUES (?, ?, 'ADMIN', 'ACTIVE', datetime('now'))",
+                (admin_email, admin_pw_hash),
+            )
+        else:
+            conn.execute(
+                "UPDATE users SET role='ADMIN', status='ACTIVE', password_hash=? WHERE id = ?",
+                (admin_pw_hash, int(existing["id"])),
+            )
         conn.execute(
             """
             CREATE TABLE IF NOT EXISTS user_profiles (
@@ -64,6 +92,100 @@ def _init_db() -> None:
             """
         )
         conn.commit()
+    finally:
+        conn.close()
+
+
+def _admin_email() -> str:
+    return env("ADMIN_EMAIL", "admin@gmail.com").lower()
+
+
+def _admin_password() -> str:
+    return env("ADMIN_PASSWORD", "Admin@123")
+
+
+def get_user_meta(user_id: int) -> Optional[dict]:
+    conn = _get_conn()
+    try:
+        cur = conn.execute(
+            "SELECT id, email, role, status, created_at FROM users WHERE id = ?",
+            (int(user_id),),
+        )
+        row = cur.fetchone()
+        if row is None:
+            return None
+        email = str(row["email"])
+        role = str(row["role"] or "USER")
+        status = str(row["status"] or "ACTIVE")
+        created_at = str(row["created_at"] or "")
+        return {"id": int(row["id"]), "email": email, "role": role, "status": status, "created_at": created_at}
+    finally:
+        conn.close()
+
+
+def list_users() -> list[dict]:
+    conn = _get_conn()
+    try:
+        cur = conn.execute("SELECT id, email, role, status, created_at FROM users ORDER BY id DESC")
+        rows = cur.fetchall() or []
+        out: list[dict] = []
+        for r in rows:
+            email = str(r["email"])
+            role = str(r["role"] or "USER")
+            out.append(
+                {
+                    "id": int(r["id"]),
+                    "email": email,
+                    "role": role,
+                    "status": str(r["status"] or "ACTIVE"),
+                    "created_at": str(r["created_at"] or ""),
+                }
+            )
+        return out
+    finally:
+        conn.close()
+
+
+def update_user(*, user_id: int, role: Optional[str] = None, status: Optional[str] = None) -> None:
+    conn = _get_conn()
+    try:
+        sets = []
+        params: list = []
+        if role is not None:
+            sets.append("role = ?")
+            params.append(str(role))
+        if status is not None:
+            sets.append("status = ?")
+            params.append(str(status))
+        if not sets:
+            return
+        params.append(int(user_id))
+        conn.execute(f"UPDATE users SET {', '.join(sets)} WHERE id = ?", tuple(params))
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def delete_user(user_id: int) -> None:
+    conn = _get_conn()
+    try:
+        # Cascade delete application data owned by the user
+        conn.execute("DELETE FROM user_goals WHERE user_id = ?", (int(user_id),))
+        conn.execute("DELETE FROM user_profiles WHERE user_id = ?", (int(user_id),))
+        conn.execute("DELETE FROM users WHERE id = ?", (int(user_id),))
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def admin_stats() -> dict:
+    conn = _get_conn()
+    try:
+        u = conn.execute("SELECT COUNT(1) AS n FROM users").fetchone()
+        g = conn.execute("SELECT COUNT(1) AS n FROM user_goals").fetchone()
+        total_users = int(u["n"]) if u is not None else 0
+        total_goals = int(g["n"]) if g is not None else 0
+        return {"total_users": total_users, "total_goals": total_goals}
     finally:
         conn.close()
 
@@ -192,9 +314,10 @@ def _create_user(email: str, password: str) -> sqlite3.Row:
     conn = _get_conn()
     try:
         password_hash = _hash_password(password)
+        role = "ADMIN" if email.lower() == _admin_email() else "USER"
         conn.execute(
-            "INSERT INTO users (email, password_hash) VALUES (?, ?)",
-            (email.lower(), password_hash),
+            "INSERT INTO users (email, password_hash, role, status, created_at) VALUES (?, ?, ?, 'ACTIVE', datetime('now'))",
+            (email.lower(), password_hash, role),
         )
         conn.commit()
         cur = conn.execute("SELECT * FROM users WHERE email = ?", (email.lower(),))
@@ -243,8 +366,14 @@ def login(payload: LoginRequest) -> TokenResponse:
     if not _verify_password(payload.password, str(row["password_hash"])):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
 
+    if str(row["status"] or "ACTIVE") == "DISABLED":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Account disabled")
+
+    email = str(row["email"])
+    role = str(row["role"] or "USER")
+
     token = create_jwt(
-        payload={"sub": str(row["id"]), "email": str(row["email"])},
+        payload={"sub": str(row["id"]), "email": email, "role": role},
         secret=_jwt_secret(),
         expires_minutes=_jwt_expires_minutes(),
     )

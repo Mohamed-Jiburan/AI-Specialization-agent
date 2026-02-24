@@ -1,4 +1,6 @@
+import { useEffect, useState } from 'react'
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom'
+import api from '../services/api'
 
 function NavItem({ to, label }) {
   const location = useLocation()
@@ -20,12 +22,31 @@ function NavItem({ to, label }) {
 function TopNav() {
   const location = useLocation()
   const navigate = useNavigate()
+  const [role, setRole] = useState(() => String(localStorage.getItem('user_role') || ''))
   const onLogout = () => {
     localStorage.removeItem('access_token')
+    localStorage.removeItem('user_role')
+    localStorage.removeItem('user_status')
     navigate('/login', { replace: true })
   }
 
   const hideGoalNav = location.pathname === '/profile-goals'
+
+  useEffect(() => {
+    const token = localStorage.getItem('access_token')
+    const existing = localStorage.getItem('user_role')
+    if (!token || existing) return
+    api
+      .get('/me')
+      .then((res) => {
+        if (res?.data?.role) {
+          localStorage.setItem('user_role', String(res.data.role))
+          setRole(String(res.data.role))
+        }
+        if (res?.data?.status) localStorage.setItem('user_status', String(res.data.status))
+      })
+      .catch(() => {})
+  }, [])
 
   return (
     <div className="sticky top-0 z-40 border-b border-slate-200 bg-white/80 backdrop-blur">
@@ -43,6 +64,7 @@ function TopNav() {
             <NavItem to="/roadmaps" label="Roadmaps" />
             <NavItem to="/swot" label="SWOT Analysis" />
             <NavItem to="/compare" label="Comparison" />
+            {role === 'ADMIN' ? <NavItem to="/admin" label="Admin" /> : null}
           </div>
         ) : (
           <div />

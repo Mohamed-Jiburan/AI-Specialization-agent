@@ -6,6 +6,7 @@ import Signup from './pages/Signup'
 import ProfileSetup from './pages/ProfileSetup'
 import ProfileGoals from './pages/ProfileGoals'
 import Dashboard from './pages/Dashboard'
+import Admin from './pages/Admin'
 import Roadmap from './pages/Roadmap'
 import CareerProfile from './pages/CareerProfile'
 import Comparison from './pages/Comparison'
@@ -23,6 +24,7 @@ export default function App() {
           <Route path="/profile" element={<ProfileSetup />} />
           <Route path="/profile-goals" element={<ProfileGoals />} />
           <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/admin" element={<Admin />} />
           <Route path="/roadmaps" element={<Roadmaps />} />
           <Route path="/swot" element={<SwotRedirect />} />
           <Route path="/roadmap/:careerId" element={<Roadmap />} />

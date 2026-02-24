@@ -22,6 +22,14 @@ export default function Login() {
       localStorage.setItem('access_token', data?.access_token || '')
 
       try {
+        const me = await api.get('/me')
+        if (me?.data?.role) localStorage.setItem('user_role', String(me.data.role))
+        if (me?.data?.status) localStorage.setItem('user_status', String(me.data.status))
+      } catch {
+        // ignore
+      }
+
+      try {
         const res = await api.get('/me/goals')
         const goals = res?.data || []
         if (Array.isArray(goals) && goals.length) {

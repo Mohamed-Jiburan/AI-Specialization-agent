@@ -8,12 +8,16 @@ from pydantic import ValidationError
 from .agent import analyze_profile
 from .agent import CAREERS
 from .auth import router as auth_router
+from .auth import admin_stats, delete_user, get_user_meta, list_users, update_user
 from .auth import create_user_goal, get_user_goal, list_user_goals
 from .auth import get_user_profile, upsert_user_profile
 from .auth import get_current_user
 from .career_profile import get_career_profile
 from .comparison_engine import compare
 from .models import (
+    AdminStatsResponse,
+    AdminUserRow,
+    AdminUserUpdateRequest,
     AnalysisResponse,
     CareerOption,
     CareerProfileResponse,
@@ -21,6 +25,7 @@ from .models import (
     ComparisonResponse,
     ProfileInput,
     RoadmapResponse,
+    UserMeResponse,
     UserGoalDetail,
     UserGoalSummary,
     UserPublic,
@@ -45,6 +50,14 @@ app.add_middleware(
 )
 
 app.include_router(auth_router)
+
+
+def require_admin(user: UserPublic = Depends(get_current_user)) -> UserPublic:
+    # Role comes from JWT, but we also re-check DB meta to be safe.
+    meta = get_user_meta(user.id) or {}
+    if str(meta.get("role") or "USER") != "ADMIN":
+        raise HTTPException(status_code=403, detail="Admin only")
+    return user
 
 
 @app.get("/careers", response_model=list[CareerOption])
@@ -160,6 +173,71 @@ def me_profile(user: UserPublic = Depends(get_current_user)) -> ProfileInput:
 def me_profile_put(payload: ProfileInput, user: UserPublic = Depends(get_current_user)) -> ProfileInput:
     upsert_user_profile(user_id=user.id, profile=payload.model_dump())
     return payload
+
+
+@app.get("/me", response_model=UserMeResponse)
+def me(user: UserPublic = Depends(get_current_user)) -> UserMeResponse:
+    meta = get_user_meta(user.id)
+    if not meta:
+        return UserMeResponse(id=user.id, email=user.email, role="USER", status="ACTIVE")
+    return UserMeResponse(
+        id=int(meta["id"]),
+        email=str(meta["email"]),
+        role=str(meta.get("role") or "USER"),
+        status=str(meta.get("status") or "ACTIVE"),
+    )
+
+
+@app.get("/admin/stats", response_model=AdminStatsResponse)
+def admin_stats_route(_user: UserPublic = Depends(require_admin)) -> AdminStatsResponse:
+    stats = admin_stats()
+    return AdminStatsResponse(
+        total_users=int(stats.get("total_users") or 0),
+        total_goals=int(stats.get("total_goals") or 0),
+        system_health="OK",
+    )
+
+
+@app.get("/admin/users", response_model=list[AdminUserRow])
+def admin_users_route(_user: UserPublic = Depends(require_admin)) -> list[AdminUserRow]:
+    rows = list_users()
+    return [
+        AdminUserRow(
+            id=int(r["id"]),
+            email=str(r["email"]),
+            role=str(r.get("role") or "USER"),
+            subscription="FREE",
+            status=str(r.get("status") or "ACTIVE"),
+            joined_at=str(r.get("created_at") or ""),
+        )
+        for r in rows
+    ]
+
+
+@app.patch("/admin/users/{user_id}", response_model=AdminUserRow)
+def admin_user_patch(
+    user_id: int,
+    payload: AdminUserUpdateRequest,
+    _user: UserPublic = Depends(require_admin),
+) -> AdminUserRow:
+    update_user(user_id=int(user_id), role=payload.role, status=payload.status)
+    meta = get_user_meta(int(user_id))
+    if not meta:
+        raise HTTPException(status_code=404, detail="User not found")
+    return AdminUserRow(
+        id=int(meta["id"]),
+        email=str(meta["email"]),
+        role=str(meta.get("role") or "USER"),
+        subscription="FREE",
+        status=str(meta.get("status") or "ACTIVE"),
+        joined_at=str(meta.get("created_at") or ""),
+    )
+
+
+@app.delete("/admin/users/{user_id}")
+def admin_user_delete(user_id: int, _user: UserPublic = Depends(require_admin)) -> dict:
+    delete_user(int(user_id))
+    return {"status": "ok"}
 
 
 @app.post("/roadmap/pdf")
