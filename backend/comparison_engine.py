@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Dict, Tuple
 
 from .agent import CAREERS
+from .skill_utils import expand_user_skills
 from .models import (
     ComparedCareer,
     ComparisonRequest,
@@ -59,7 +60,8 @@ def _score(profile: ProfileInput, career_id: str) -> ComparedCareer:
         "risk": 0.10,
     }
 
-    skill_match, missing = _skill_match(c.required_skills, profile.skills)
+    user_skills = expand_user_skills(profile.skills)
+    skill_match, missing = _skill_match(c.required_skills, user_skills)
     salary_fit = _salary_fit(profile.salary_preference, c.salary)
     risk_fit = _risk_fit(profile.risk_tolerance, c.automation_risk)
 

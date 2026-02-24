@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Dict, List, Tuple
 
+from .skill_utils import expand_user_skills
 from .models import (
     AnalysisResponse,
     CareerMatch,
@@ -105,7 +106,7 @@ def _salary_fit(salary_preference: int, salary_score: float) -> float:
 
 
 def analyze_profile(profile: ProfileInput) -> AnalysisResponse:
-    skills = _normalize_terms(profile.skills)
+    skills = expand_user_skills(profile.skills)
 
     weights: Dict[str, float] = {
         "skills": 0.40,
@@ -114,6 +115,11 @@ def analyze_profile(profile: ProfileInput) -> AnalysisResponse:
         "stability": 0.10,
         "risk": 0.10,
     }
+
+    if profile.experience_level == "Beginner":
+        weights["skills"] = 0.5
+    if profile.experience_level == "Advanced":
+        weights["growth"] = 0.3
 
     matches: List[CareerMatch] = []
 

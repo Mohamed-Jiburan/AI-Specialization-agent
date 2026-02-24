@@ -31,6 +31,7 @@ ExperienceLevel = Literal["Beginner", "Intermediate", "Advanced"]
 class CareerOption(BaseModel):
     id: str
     title: str
+    required_skills: List[str] = Field(default_factory=list)
 
 
 class ProfileInput(BaseModel):
@@ -80,6 +81,19 @@ class AnalysisResponse(BaseModel):
     dominant_decision_factor: str
     top_matches: List[CareerMatch]
     explainability: Explainability
+
+
+class UserGoalSummary(BaseModel):
+    id: int
+    goal_title: str
+    match_percent: float = Field(ge=0, le=100)
+    explanation: str
+
+
+class UserGoalDetail(BaseModel):
+    id: int
+    profile: ProfileInput
+    analysis: AnalysisResponse
 
 
 class RoadmapGap(BaseModel):

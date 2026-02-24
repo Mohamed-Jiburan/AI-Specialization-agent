@@ -108,6 +108,7 @@ def groq_swot_narrative(*, profile: dict[str, Any], career_profile: dict[str, An
                 "Max 120 words",
                 "No markdown",
                 "Make it actionable and specific",
+                "The narrative MUST be written for the career in career_profile.career_title (ignore profile.goal if different)",
             ],
             "input": {"profile": profile, "career_profile": career_profile},
         }

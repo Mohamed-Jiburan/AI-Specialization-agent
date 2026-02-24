@@ -20,6 +20,18 @@ export default function Login() {
     try {
       const { data } = await api.post('/auth/login', { email, password })
       localStorage.setItem('access_token', data?.access_token || '')
+
+      try {
+        const res = await api.get('/me/goals')
+        const goals = res?.data || []
+        if (Array.isArray(goals) && goals.length) {
+          navigate('/profile-goals', { replace: true })
+          return
+        }
+      } catch {
+        // no saved profile -> continue to onboarding
+      }
+
       navigate('/profile', { replace: true })
     } catch (err) {
       setError(err?.response?.data?.detail || 'Login failed')

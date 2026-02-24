@@ -8,6 +8,8 @@ from pydantic import ValidationError
 from .agent import analyze_profile
 from .agent import CAREERS
 from .auth import router as auth_router
+from .auth import create_user_goal, get_user_goal, list_user_goals
+from .auth import get_user_profile, upsert_user_profile
 from .auth import get_current_user
 from .career_profile import get_career_profile
 from .comparison_engine import compare
@@ -19,6 +21,8 @@ from .models import (
     ComparisonResponse,
     ProfileInput,
     RoadmapResponse,
+    UserGoalDetail,
+    UserGoalSummary,
     UserPublic,
 )
 from .llm import groq_reasoning_points
@@ -32,6 +36,8 @@ app.add_middleware(
     allow_origins=[
         "http://localhost:5173",
         "http://127.0.0.1:5173",
+        "http://localhost:5174",
+        "http://127.0.0.1:5174",
     ],
     allow_credentials=True,
     allow_methods=["*"],
@@ -43,12 +49,14 @@ app.include_router(auth_router)
 
 @app.get("/careers", response_model=list[CareerOption])
 def careers() -> list[CareerOption]:
-    return [CareerOption(id=c.id, title=c.title) for c in CAREERS]
+    return [CareerOption(id=c.id, title=c.title, required_skills=c.required_skills) for c in CAREERS]
 
 
 @app.post("/analyze", response_model=AnalysisResponse)
 def analyze(payload: ProfileInput, user: UserPublic = Depends(get_current_user)) -> AnalysisResponse:
     _ = user
+    # Persist profile for returning users (so onboarding is not required next login).
+    upsert_user_profile(user_id=user.id, profile=payload.model_dump())
     analysis = analyze_profile(payload)
     pts = groq_reasoning_points(analysis)
     if pts:
@@ -60,6 +68,98 @@ def analyze(payload: ProfileInput, user: UserPublic = Depends(get_current_user))
             }
         )
     return analysis
+
+
+@app.get("/me/goals", response_model=list[UserGoalSummary])
+def me_goals(user: UserPublic = Depends(get_current_user)) -> list[UserGoalSummary]:
+    rows = list_user_goals(user.id)
+    out: list[UserGoalSummary] = []
+    for r in rows:
+        profile = r.get("profile") or {}
+        analysis = r.get("analysis") or {}
+
+        goal_title = str(profile.get("goal") or "")
+        match_percent = 0.0
+        explanation = ""
+        try:
+            top = analysis.get("top_matches") or []
+            if isinstance(top, list) and goal_title:
+                found = next((m for m in top if (m or {}).get("title") == goal_title), None)
+                if found:
+                    match_percent = float(((found.get("breakdown") or {}).get("match_percent")) or 0.0)
+        except Exception:
+            match_percent = 0.0
+
+        try:
+            pts = (((analysis.get("explainability") or {}).get("reasoning_points")) or [])
+            if isinstance(pts, list) and pts:
+                explanation = str(pts[0])
+        except Exception:
+            explanation = ""
+
+        if not explanation:
+            dom = str(analysis.get("dominant_decision_factor") or "")
+            explanation = f"Top match is driven mostly by {dom} weighting." if dom else ""
+
+        out.append(
+            UserGoalSummary(
+                id=int(r["id"]),
+                goal_title=goal_title or "Career goal",
+                match_percent=max(0.0, min(100.0, match_percent)),
+                explanation=explanation or "",
+            )
+        )
+    return out
+
+
+@app.post("/me/goals", response_model=UserGoalDetail)
+def me_goals_create(payload: ProfileInput, user: UserPublic = Depends(get_current_user)) -> UserGoalDetail:
+    # Save last profile too for compatibility with existing dashboard flow.
+    upsert_user_profile(user_id=user.id, profile=payload.model_dump())
+
+    analysis = analyze_profile(payload)
+    pts = groq_reasoning_points(analysis)
+    if pts:
+        analysis = analysis.model_copy(
+            update={
+                "explainability": analysis.explainability.model_copy(
+                    update={"reasoning_points": pts}
+                )
+            }
+        )
+
+    goal_id = create_user_goal(user_id=user.id, profile=payload.model_dump(), analysis=analysis.model_dump())
+    return UserGoalDetail(id=goal_id, profile=payload, analysis=analysis)
+
+
+@app.get("/me/goals/{goal_id}", response_model=UserGoalDetail)
+def me_goals_get(goal_id: int, user: UserPublic = Depends(get_current_user)) -> UserGoalDetail:
+    row = get_user_goal(user_id=user.id, goal_id=int(goal_id))
+    if not row:
+        raise HTTPException(status_code=404, detail="Goal not found")
+    try:
+        profile = ProfileInput.model_validate(row["profile"])
+        analysis = AnalysisResponse.model_validate(row["analysis"])
+    except Exception:
+        raise HTTPException(status_code=500, detail="Saved goal data is invalid")
+    return UserGoalDetail(id=int(row["id"]), profile=profile, analysis=analysis)
+
+
+@app.get("/me/profile", response_model=ProfileInput)
+def me_profile(user: UserPublic = Depends(get_current_user)) -> ProfileInput:
+    profile = get_user_profile(user.id)
+    if not profile:
+        raise HTTPException(status_code=404, detail="No profile saved")
+    try:
+        return ProfileInput.model_validate(profile)
+    except Exception:
+        raise HTTPException(status_code=500, detail="Saved profile is invalid")
+
+
+@app.put("/me/profile", response_model=ProfileInput)
+def me_profile_put(payload: ProfileInput, user: UserPublic = Depends(get_current_user)) -> ProfileInput:
+    upsert_user_profile(user_id=user.id, profile=payload.model_dump())
+    return payload
 
 
 @app.post("/roadmap/pdf")

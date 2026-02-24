@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import List
 
 from .agent import CAREERS
+from .skill_utils import expand_user_skills
 from .models import Explainability, ProfileInput, SWOT
 
 
@@ -22,7 +23,7 @@ def generate_swot(profile: ProfileInput, career_id: str) -> SWOT:
     if career is None:
         raise ValueError("Unknown career_id")
 
-    user_skills = set(_normalize(profile.skills))
+    user_skills = set(expand_user_skills(profile.skills))
     required = _normalize(career.required_skills)
     have = [s for s in required if s in user_skills]
     missing = [s for s in required if s not in user_skills]
@@ -43,6 +44,9 @@ def generate_swot(profile: ProfileInput, career_id: str) -> SWOT:
         "Open-source + blogging can accelerate credibility.",
         "Internships/remote projects can substitute for formal experience.",
     ]
+
+    if profile.experience_level == "Beginner":
+        opportunities.append("Beginner-friendly internships available.")
 
     threats = [
         "Rapid tool changes require continuous learning.",

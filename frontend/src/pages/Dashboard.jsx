@@ -3,7 +3,6 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { PolarAngleAxis, PolarGrid, PolarRadiusAxis, Radar, RadarChart, ResponsiveContainer } from 'recharts'
 import AnimatedNumber from '../components/AnimatedNumber'
-import FeasibilityGauge from '../components/FeasibilityGauge'
 import api from '../services/api'
 
 export default function Dashboard() {
@@ -52,6 +51,16 @@ export default function Dashboard() {
 
   const matches = analysis?.top_matches || []
   const best = matches?.[0]
+
+  const readiness = useMemo(() => {
+    const skill = Number(best?.breakdown?.skill_match_percent ?? 0)
+    const feas = Number(best?.feasibility ?? 0)
+    const v = Math.round((0.7 * skill) + (0.3 * feas))
+    const label = v >= 70 ? 'Ready' : v >= 40 ? 'Almost there' : 'Needs upskilling'
+    const tone = v >= 70 ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : v >= 40 ? 'bg-amber-50 border-amber-200 text-amber-700' : 'bg-rose-50 border-rose-200 text-rose-700'
+    const detail = v >= 70 ? 'You already match most key skills for this role.' : v >= 40 ? 'You have a base; focus on a few missing skills.' : 'Start with fundamentals, then build 1–2 projects.'
+    return { value: Math.max(0, Math.min(100, v)), label, tone, detail }
+  }, [best])
 
   const radarData = useMemo(() => {
     const r = best?.radar
@@ -191,6 +200,30 @@ export default function Dashboard() {
             </motion.div>
 
             <div className="rounded-2xl bg-white border border-slate-200 shadow-sm p-5">
+              <div className="text-sm font-semibold text-slate-900">What this confidence means</div>
+              <div className="mt-2 text-xs text-slate-600">
+                This score is a reliability signal for the recommendation list. It is based on how strong your skill match is and how far the #1 role is ahead of the #2 role.
+              </div>
+              <div className="mt-3 grid gap-2 text-xs">
+                <div className="flex items-center justify-between rounded-xl bg-slate-50 border border-slate-200 px-3 py-2">
+                  <div className="font-semibold text-slate-900">0–35</div>
+                  <div className="text-slate-600">Uncertain: many roles look similar. Add more skills/interests or refine goal.</div>
+                </div>
+                <div className="flex items-center justify-between rounded-xl bg-slate-50 border border-slate-200 px-3 py-2">
+                  <div className="font-semibold text-slate-900">35–70</div>
+                  <div className="text-slate-600">Moderate: recommendation is reasonable, but 2–3 roles may be close.</div>
+                </div>
+                <div className="flex items-center justify-between rounded-xl bg-slate-50 border border-slate-200 px-3 py-2">
+                  <div className="font-semibold text-slate-900">70–100</div>
+                  <div className="text-slate-600">High: top choice is clearly best-fit for your current profile.</div>
+                </div>
+              </div>
+              <div className="mt-3 text-xs text-slate-500">
+                Safety note: this is not personal safety. Lower confidence means you should validate by comparing roles and checking missing skills.
+              </div>
+            </div>
+
+            <div className="rounded-2xl bg-white border border-slate-200 shadow-sm p-5">
               <div className="text-sm font-semibold text-slate-900">Skill radar</div>
               <div className="mt-1 text-xs text-slate-500">Best match: {best?.title || '—'}</div>
 
@@ -211,10 +244,33 @@ export default function Dashboard() {
             </div>
 
             <div className="rounded-2xl bg-white border border-slate-200 shadow-sm p-5">
-              <div className="text-sm font-semibold text-slate-900">Feasibility</div>
+              <div className="text-sm font-semibold text-slate-900">Readiness & Skill Gap</div>
               <div className="mt-1 text-xs text-slate-500">Best match: {best?.title || '—'}</div>
-              <div className="mt-4 flex justify-center">
-                <FeasibilityGauge value={best?.feasibility} />
+
+              <div className="mt-4 flex items-center justify-between gap-3">
+                <div className="text-3xl font-semibold text-slate-900">{readiness.value}%</div>
+                <div className={`inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold ${readiness.tone}`}>{readiness.label}</div>
+              </div>
+
+              <div className="mt-3 h-2 rounded-full bg-slate-100 overflow-hidden">
+                <div className="h-full bg-blue-600" style={{ width: `${readiness.value}%` }} />
+              </div>
+
+              <div className="mt-3 text-xs text-slate-600">{readiness.detail}</div>
+
+              <div className="mt-4">
+                <div className="text-xs font-semibold text-slate-500">Top missing skills (start here)</div>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {(best?.missing_skills || []).slice(0, 6).length ? (
+                    (best?.missing_skills || []).slice(0, 6).map((s) => (
+                      <span key={s} className="rounded-full bg-slate-100 border border-slate-200 px-3 py-1 text-xs font-semibold text-slate-700">
+                        {s}
+                      </span>
+                    ))
+                  ) : (
+                    <div className="text-xs text-slate-600">No missing skills detected.</div>
+                  )}
+                </div>
               </div>
             </div>
           </div>

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import json
 import sqlite3
 from datetime import timedelta
 from typing import Optional
@@ -37,6 +38,128 @@ def _init_db() -> None:
                 password_hash TEXT NOT NULL
             )
             """
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS user_profiles (
+                user_id INTEGER PRIMARY KEY,
+                profile_json TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                FOREIGN KEY(user_id) REFERENCES users(id)
+            )
+            """
+        )
+
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS user_goals (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                profile_json TEXT NOT NULL,
+                analysis_json TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                FOREIGN KEY(user_id) REFERENCES users(id)
+            )
+            """
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def create_user_goal(*, user_id: int, profile: dict, analysis: dict) -> int:
+    conn = _get_conn()
+    try:
+        cur = conn.execute(
+            """
+            INSERT INTO user_goals (user_id, profile_json, analysis_json, created_at, updated_at)
+            VALUES (?, ?, ?, datetime('now'), datetime('now'))
+            """,
+            (int(user_id), json.dumps(profile), json.dumps(analysis)),
+        )
+        conn.commit()
+        return int(cur.lastrowid)
+    finally:
+        conn.close()
+
+
+def list_user_goals(user_id: int) -> list[dict]:
+    conn = _get_conn()
+    try:
+        cur = conn.execute(
+            "SELECT id, profile_json, analysis_json, updated_at FROM user_goals WHERE user_id = ? ORDER BY updated_at DESC",
+            (int(user_id),),
+        )
+        rows = cur.fetchall() or []
+        out: list[dict] = []
+        for r in rows:
+            try:
+                profile = json.loads(r["profile_json"]) if r["profile_json"] else None
+                analysis = json.loads(r["analysis_json"]) if r["analysis_json"] else None
+            except Exception:
+                continue
+            if not isinstance(profile, dict) or not isinstance(analysis, dict):
+                continue
+            out.append({"id": int(r["id"]), "profile": profile, "analysis": analysis})
+        return out
+    finally:
+        conn.close()
+
+
+def get_user_goal(*, user_id: int, goal_id: int) -> Optional[dict]:
+    conn = _get_conn()
+    try:
+        cur = conn.execute(
+            "SELECT id, profile_json, analysis_json FROM user_goals WHERE user_id = ? AND id = ?",
+            (int(user_id), int(goal_id)),
+        )
+        r = cur.fetchone()
+        if r is None:
+            return None
+        try:
+            profile = json.loads(r["profile_json"]) if r["profile_json"] else None
+            analysis = json.loads(r["analysis_json"]) if r["analysis_json"] else None
+        except Exception:
+            return None
+        if not isinstance(profile, dict) or not isinstance(analysis, dict):
+            return None
+        return {"id": int(r["id"]), "profile": profile, "analysis": analysis}
+    finally:
+        conn.close()
+
+
+def get_user_profile(user_id: int) -> Optional[dict]:
+    conn = _get_conn()
+    try:
+        cur = conn.execute("SELECT profile_json FROM user_profiles WHERE user_id = ?", (int(user_id),))
+        row = cur.fetchone()
+        if row is None:
+            return None
+        raw = row["profile_json"]
+        if not raw:
+            return None
+        try:
+            parsed = json.loads(raw)
+            return parsed if isinstance(parsed, dict) else None
+        except Exception:
+            return None
+    finally:
+        conn.close()
+
+
+def upsert_user_profile(*, user_id: int, profile: dict) -> None:
+    conn = _get_conn()
+    try:
+        conn.execute(
+            """
+            INSERT INTO user_profiles (user_id, profile_json, updated_at)
+            VALUES (?, ?, datetime('now'))
+            ON CONFLICT(user_id) DO UPDATE SET
+                profile_json=excluded.profile_json,
+                updated_at=datetime('now')
+            """,
+            (int(user_id), json.dumps(profile)),
         )
         conn.commit()
     finally:

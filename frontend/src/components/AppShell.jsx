@@ -18,11 +18,14 @@ function NavItem({ to, label }) {
 }
 
 function TopNav() {
+  const location = useLocation()
   const navigate = useNavigate()
   const onLogout = () => {
     localStorage.removeItem('access_token')
     navigate('/login', { replace: true })
   }
+
+  const hideGoalNav = location.pathname === '/profile-goals'
 
   return (
     <div className="sticky top-0 z-40 border-b border-slate-200 bg-white/80 backdrop-blur">
@@ -34,18 +37,23 @@ function TopNav() {
           <div className="text-sm font-semibold text-slate-900">AI Specialization Pro</div>
         </div>
 
-        <div className="hidden md:flex items-center gap-1">
-          <NavItem to="/dashboard" label="Dashboard" />
-          <NavItem to="/roadmaps" label="Roadmaps" />
-          <NavItem to="/swot" label="SWOT Analysis" />
-          <NavItem to="/compare" label="Comparison" />
-        </div>
+        {!hideGoalNav ? (
+          <div className="hidden md:flex items-center gap-1">
+            <NavItem to="/dashboard" label="Dashboard" />
+            <NavItem to="/roadmaps" label="Roadmaps" />
+            <NavItem to="/swot" label="SWOT Analysis" />
+            <NavItem to="/compare" label="Comparison" />
+          </div>
+        ) : (
+          <div />
+        )}
 
         <div className="flex items-center gap-2">
+          <NavItem to="/profile-goals" label="Profile" />
           <button
             type="button"
             onClick={onLogout}
-            className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+            className="h-9 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50"
           >
             Sign out
           </button>

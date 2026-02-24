@@ -4,6 +4,7 @@ from typing import List
 
 from .agent import CAREERS
 from .llm import groq_roadmap_narrative
+from .skill_utils import expand_user_skills
 from .models import (
     Explainability,
     ProfileInput,
@@ -28,7 +29,7 @@ def _career_by_id(career_id: str):
 
 def _gap(required: List[str], user: List[str]) -> RoadmapGap:
     req = _normalize(required)
-    have = set(_normalize(user))
+    have = set(expand_user_skills(user))
     missing = [s for s in req if s not in have]
     have_list = [s for s in req if s in have]
     gap_percent = 0.0 if not req else (len(missing) / len(req)) * 100.0
@@ -43,6 +44,7 @@ def generate_roadmap(profile: ProfileInput, career_id: str) -> RoadmapResponse:
     gap = _gap(career.required_skills, profile.skills)
 
     missing = gap.missing
+    top_missing = missing[:3]
     exp = profile.experience_level
 
     if exp == "Beginner":
@@ -50,7 +52,12 @@ def generate_roadmap(profile: ProfileInput, career_id: str) -> RoadmapResponse:
             RoadmapPhase(
                 title="Foundations",
                 months="Month 1–2",
-                focus=["Python fluency", "Math + stats basics", "Git + notebooks"],
+                focus=[
+                    "Close gaps: " + ", ".join(top_missing),
+                    "Python fluency",
+                    "Math + stats basics",
+                    "Git + notebooks",
+                ],
                 projects=["EDA mini-project", "Data cleaning pipeline"],
             ),
             RoadmapPhase(

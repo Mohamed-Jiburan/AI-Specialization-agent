@@ -9,6 +9,7 @@ export default function ProfileSetup() {
   const [interestsText, setInterestsText] = useState('')
   const [goal, setGoal] = useState('ML Engineer')
   const [experienceLevel, setExperienceLevel] = useState('Beginner')
+  const [experienceMode, setExperienceMode] = useState('manual')
   const [riskTolerance, setRiskTolerance] = useState(50)
   const [salaryPreference, setSalaryPreference] = useState(50)
   const [loading, setLoading] = useState(false)
@@ -16,7 +17,7 @@ export default function ProfileSetup() {
   const [careerOptions, setCareerOptions] = useState([])
   const [step, setStep] = useState(1)
 
-  const canContinueStep1 = Boolean(goal) && Boolean(experienceLevel)
+  const canContinueStep1 = Boolean(goal)
   const canContinueStep2 = true
   const isLast = step === 3
 
@@ -58,10 +59,76 @@ export default function ProfileSetup() {
     [interestsText]
   )
 
-  const canSubmit = useMemo(() => goal && experienceLevel, [goal, experienceLevel])
+  const liveAnalysisConfidence = useMemo(() => {
+    if (skills.length === 0) return 0
 
-  const onSubmit = async (e) => {
-    e.preventDefault()
+    const normalize = (s) => String(s || '').trim().toLowerCase()
+    const skillsNorm = skills.map(normalize).filter(Boolean)
+    const interestsNorm = interests.map(normalize).filter(Boolean)
+
+    const knownInterests = new Set(
+      [
+        'nlp',
+        'natural language processing',
+        'computer vision',
+        'cv',
+        'mlops',
+        'machine learning',
+        'deep learning',
+        'data science',
+        'generative ai',
+        'llm',
+        'large language models',
+        'reinforcement learning',
+      ].map(normalize)
+    )
+
+    const selectedCareer = (careerOptions || []).find((c) => c?.title === goal)
+    const required = Array.isArray(selectedCareer?.required_skills) ? selectedCareer.required_skills : []
+    const requiredSet = new Set(required.map(normalize).filter(Boolean))
+
+    const recognized = requiredSet.size === 0
+      ? skillsNorm
+      : skillsNorm.filter((s) => requiredSet.has(s))
+
+    const matchRatio = required.length > 0 ? recognized.length / required.length : 0
+
+    // Weighting: skills dominate this metric; interests are a small boost.
+    const skillComponent = Math.round(Math.min(70, matchRatio * 70))
+    const recognizedInterests = interestsNorm.filter((x) => knownInterests.has(x))
+    const interestComponent = Math.min(25, recognizedInterests.length * 5)
+    const total = Math.min(95, skillComponent + interestComponent)
+    return total
+  }, [skills, interests, careerOptions, goal])
+
+  const inferredExperienceLevel = useMemo(() => {
+    const normalize = (s) => String(s || '').trim().toLowerCase()
+    const skillsNorm = skills.map(normalize).filter(Boolean)
+
+    const selectedCareer = (careerOptions || []).find((c) => c?.title === goal)
+    const required = Array.isArray(selectedCareer?.required_skills) ? selectedCareer.required_skills : []
+    const requiredNorm = required.map(normalize).filter(Boolean)
+    const requiredSet = new Set(requiredNorm)
+
+    if (requiredNorm.length > 0) {
+      const recognized = skillsNorm.filter((s) => requiredSet.has(s))
+      const ratio = recognized.length / requiredNorm.length
+      if (ratio >= 0.67) return 'Advanced'
+      if (ratio >= 0.34) return 'Intermediate'
+      return 'Beginner'
+    }
+
+    if (skillsNorm.length >= 8) return 'Advanced'
+    if (skillsNorm.length >= 4) return 'Intermediate'
+    return 'Beginner'
+  }, [skills, careerOptions, goal])
+
+  const effectiveExperienceLevel = experienceMode === 'auto' ? inferredExperienceLevel : experienceLevel
+
+  const canSubmit = useMemo(() => goal && effectiveExperienceLevel, [goal, effectiveExperienceLevel])
+
+  const onAnalyze = async () => {
+    if (step !== 3) return
     if (!canSubmit) return
     setLoading(true)
     setError('')
@@ -70,14 +137,15 @@ export default function ProfileSetup() {
         skills,
         interests,
         goal,
-        experience_level: experienceLevel,
+        experience_level: effectiveExperienceLevel,
         risk_tolerance: Number(riskTolerance),
         salary_preference: Number(salaryPreference)
       }
       localStorage.setItem('profile', JSON.stringify(payload))
-      const { data } = await api.post('/analyze', payload)
-      localStorage.setItem('analysis', JSON.stringify(data || {}))
-      navigate('/dashboard', { replace: true })
+      const { data } = await api.post('/me/goals', payload)
+      localStorage.setItem('analysis', JSON.stringify(data?.analysis || {}))
+      if (data?.id != null) localStorage.setItem('active_goal_id', String(data.id))
+      navigate('/profile-goals', { replace: true })
     } catch (err) {
       setError(err?.response?.data?.detail || 'Analyze failed')
     } finally {
@@ -147,7 +215,12 @@ export default function ProfileSetup() {
                 </div>
               </div>
 
-              <form onSubmit={onSubmit} className="p-6 space-y-6">
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault()
+                }}
+                className="p-6 space-y-6"
+              >
                 {step === 1 ? (
                   <div className="space-y-4">
                     <div>
@@ -165,17 +238,66 @@ export default function ProfileSetup() {
                       </select>
                       <div className="mt-2 text-xs text-slate-500">Try to be specific about role and scale.</div>
                     </div>
+                  </div>
+                ) : null}
+
+                {step === 2 ? (
+                  <div className="space-y-4">
+                    <div className="grid md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="text-xs font-medium text-slate-700">Skills (comma-separated)</label>
+                        <input
+                          value={skillsText}
+                          onChange={(e) => setSkillsText(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') e.preventDefault()
+                          }}
+                          className="mt-2 w-full rounded-xl bg-white border border-slate-200 px-3 py-2 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                          placeholder="python, sql, numpy, docker"
+                        />
+                        <div className="mt-2 text-xs text-slate-500">Detected: {skills.length}</div>
+                      </div>
+
+                      <div>
+                        <label className="text-xs font-medium text-slate-700">Interests (comma-separated)</label>
+                        <input
+                          value={interestsText}
+                          onChange={(e) => setInterestsText(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') e.preventDefault()
+                          }}
+                          className="mt-2 w-full rounded-xl bg-white border border-slate-200 px-3 py-2 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                          placeholder="computer vision, nlp, mlops"
+                        />
+                        <div className="mt-2 text-xs text-slate-500">Detected: {interests.length}</div>
+                      </div>
+                    </div>
 
                     <div>
                       <div className="text-xs font-medium text-slate-700">Current Experience Level</div>
-                      <div className="mt-2 grid grid-cols-3 gap-2">
+                      <div className="mt-2 grid grid-cols-4 gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setExperienceMode('auto')}
+                          className={
+                            experienceMode === 'auto'
+                              ? 'h-10 rounded-xl bg-blue-600 text-white text-sm font-semibold'
+                              : 'h-10 rounded-xl bg-white border border-slate-200 text-slate-700 text-sm font-semibold hover:bg-slate-50'
+                          }
+                        >
+                          Auto
+                        </button>
+
                         {['Beginner', 'Intermediate', 'Advanced'].map((x) => (
                           <button
                             key={x}
                             type="button"
-                            onClick={() => setExperienceLevel(x)}
+                            onClick={() => {
+                              setExperienceMode('manual')
+                              setExperienceLevel(x)
+                            }}
                             className={
-                              experienceLevel === x
+                              experienceMode === 'manual' && experienceLevel === x
                                 ? 'h-10 rounded-xl bg-blue-600 text-white text-sm font-semibold'
                                 : 'h-10 rounded-xl bg-white border border-slate-200 text-slate-700 text-sm font-semibold hover:bg-slate-50'
                             }
@@ -184,32 +306,12 @@ export default function ProfileSetup() {
                           </button>
                         ))}
                       </div>
-                    </div>
-                  </div>
-                ) : null}
 
-                {step === 2 ? (
-                  <div className="grid md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="text-xs font-medium text-slate-700">Skills (comma-separated)</label>
-                      <input
-                        value={skillsText}
-                        onChange={(e) => setSkillsText(e.target.value)}
-                        className="mt-2 w-full rounded-xl bg-white border border-slate-200 px-3 py-2 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-                        placeholder="python, sql, numpy, docker"
-                      />
-                      <div className="mt-2 text-xs text-slate-500">Detected: {skills.length}</div>
-                    </div>
-
-                    <div>
-                      <label className="text-xs font-medium text-slate-700">Interests (comma-separated)</label>
-                      <input
-                        value={interestsText}
-                        onChange={(e) => setInterestsText(e.target.value)}
-                        className="mt-2 w-full rounded-xl bg-white border border-slate-200 px-3 py-2 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-                        placeholder="computer vision, nlp, mlops"
-                      />
-                      <div className="mt-2 text-xs text-slate-500">Detected: {interests.length}</div>
+                      {experienceMode === 'auto' ? (
+                        <div className="mt-2 text-xs text-slate-500">
+                          Suggested level: <span className="font-semibold text-slate-700">{inferredExperienceLevel}</span>
+                        </div>
+                      ) : null}
                     </div>
                   </div>
                 ) : null}
@@ -271,6 +373,8 @@ export default function ProfileSetup() {
                     </button>
                   ) : (
                     <button
+                      type="button"
+                      onClick={onAnalyze}
                       disabled={!canSubmit || loading}
                       className="h-10 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:hover:bg-blue-600 transition px-4 text-sm font-semibold text-white"
                     >
@@ -280,6 +384,26 @@ export default function ProfileSetup() {
                 </div>
 
                 <div className="text-xs text-slate-500">Your data is encrypted and used only for career modeling.</div>
+
+                {step === 3 ? (
+                  <div className="mt-3 rounded-xl bg-white border border-slate-200 shadow-sm p-4">
+                    <div className="text-xs font-semibold text-slate-900">How to choose these sliders</div>
+                    <div className="mt-2 text-xs text-slate-600">
+                      Risk tolerance controls how comfortable you are with fast-changing, higher-automation-risk roles.
+                      Salary preference controls how strongly salary affects the ranking.
+                    </div>
+                    <div className="mt-3 grid sm:grid-cols-2 gap-3 text-xs text-slate-700">
+                      <div className="rounded-lg bg-slate-50 border border-slate-200 p-3">
+                        <div className="font-semibold text-slate-900">Risk tolerance</div>
+                        <div className="mt-1 text-slate-600">Choose 30 for stable/safe. Choose 50 if unsure. Choose 70 if you’re OK with uncertainty.</div>
+                      </div>
+                      <div className="rounded-lg bg-slate-50 border border-slate-200 p-3">
+                        <div className="font-semibold text-slate-900">Salary preference</div>
+                        <div className="mt-1 text-slate-600">Choose 30 if salary isn’t a priority. Choose 50 if unsure. Choose 80 if salary is very important.</div>
+                      </div>
+                    </div>
+                  </div>
+                ) : null}
               </form>
             </div>
           </div>
@@ -301,12 +425,12 @@ export default function ProfileSetup() {
                   <div className="text-sm font-semibold text-slate-900">Live Analysis Confidence</div>
                   <div className="mt-1 text-xs text-slate-600">Profile completeness signal</div>
                 </div>
-                <div className="text-sm font-semibold text-slate-900">{Math.min(95, 40 + skills.length * 4 + interests.length * 3)}%</div>
+                <div className="text-sm font-semibold text-slate-900">{liveAnalysisConfidence}%</div>
               </div>
               <div className="mt-4 h-2 rounded-full bg-slate-100 overflow-hidden">
                 <div
                   className="h-full bg-blue-600"
-                  style={{ width: `${Math.min(95, 40 + skills.length * 4 + interests.length * 3)}%` }}
+                  style={{ width: `${liveAnalysisConfidence}%` }}
                 />
               </div>
               <div className="mt-3 text-xs text-slate-600">
