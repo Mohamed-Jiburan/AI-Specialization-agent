@@ -3,6 +3,7 @@ import AppShell from './components/AppShell'
 import ProtectedRoute from './components/ProtectedRoute'
 import Login from './pages/Login'
 import Signup from './pages/Signup'
+import ForgotPassword from './pages/ForgotPassword'
 import ProfileSetup from './pages/ProfileSetup'
 import ProfileGoals from './pages/ProfileGoals'
 import Dashboard from './pages/Dashboard'
@@ -18,6 +19,7 @@ export default function App() {
     <Routes>
       <Route path="/login" element={<Login />} />
       <Route path="/signup" element={<Signup />} />
+      <Route path="/reset-password" element={<ForgotPassword />} />
 
       <Route element={<ProtectedRoute />}>
         <Route element={<AppShell />}>

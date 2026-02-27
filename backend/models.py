@@ -15,6 +15,11 @@ class LoginRequest(BaseModel):
     password: str
 
 
+class ResetPasswordRequest(BaseModel):
+    email: EmailStr
+    new_password: str = Field(min_length=8, max_length=72)
+
+
 class TokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
@@ -58,6 +63,7 @@ ExperienceLevel = Literal["Beginner", "Intermediate", "Advanced"]
 class CareerOption(BaseModel):
     id: str
     title: str
+    category: str = "General"
     required_skills: List[str] = Field(default_factory=list)
 
 

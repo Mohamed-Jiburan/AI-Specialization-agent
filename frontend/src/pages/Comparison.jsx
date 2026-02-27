@@ -1,6 +1,8 @@
 import { motion } from 'framer-motion'
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
+import api from '../services/api'
+import SearchableGroupedSelect from '../components/SearchableGroupedSelect'
 import {
   PolarAngleAxis,
   PolarGrid,
@@ -10,7 +12,6 @@ import {
   ResponsiveContainer,
   Tooltip
 } from 'recharts'
-import api from '../services/api'
 
 function MetricRow({ label, a, b, suffix = '%' }) {
   return (
@@ -113,32 +114,32 @@ export default function Comparison() {
           <div className="grid md:grid-cols-3 gap-4 items-end">
             <div>
               <label className="text-xs text-slate-600">Career A</label>
-              <select
-                value={careerA}
-                onChange={(e) => setCareerA(e.target.value)}
-                className="mt-1 w-full rounded-xl bg-white border border-slate-200 px-3 py-2 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-              >
-                {(careerOptions.length ? careerOptions : [{ id: 'loading', title: 'Loading…' }]).map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.title}
-                  </option>
-                ))}
-              </select>
+              <div className="mt-1">
+                <SearchableGroupedSelect
+                  options={careerOptions.length ? careerOptions : [{ id: 'loading', title: 'Loading…', category: 'General' }]}
+                  value={careerA}
+                  onChange={(v) => setCareerA(v)}
+                  placeholder="Select career"
+                  getOptionLabel={(c) => c?.title}
+                  getOptionValue={(c) => c?.id}
+                  groupBy={(c) => c?.category || 'General'}
+                />
+              </div>
             </div>
 
             <div>
               <label className="text-xs text-slate-600">Career B</label>
-              <select
-                value={careerB}
-                onChange={(e) => setCareerB(e.target.value)}
-                className="mt-1 w-full rounded-xl bg-white border border-slate-200 px-3 py-2 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-              >
-                {(careerOptions.length ? careerOptions : [{ id: 'loading', title: 'Loading…' }]).map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.title}
-                  </option>
-                ))}
-              </select>
+              <div className="mt-1">
+                <SearchableGroupedSelect
+                  options={careerOptions.length ? careerOptions : [{ id: 'loading', title: 'Loading…', category: 'General' }]}
+                  value={careerB}
+                  onChange={(v) => setCareerB(v)}
+                  placeholder="Select career"
+                  getOptionLabel={(c) => c?.title}
+                  getOptionValue={(c) => c?.id}
+                  groupBy={(c) => c?.category || 'General'}
+                />
+              </div>
             </div>
 
             <button

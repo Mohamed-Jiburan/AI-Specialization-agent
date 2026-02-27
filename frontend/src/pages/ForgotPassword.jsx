@@ -39,16 +39,19 @@ function Rule({ ok, text }) {
   )
 }
 
-export default function Signup() {
+export default function ForgotPassword() {
   const navigate = useNavigate()
   const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [showPassword, setShowPassword] = useState(false)
+  const [newPassword, setNewPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [showNewPassword, setShowNewPassword] = useState(false)
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [success, setSuccess] = useState('')
 
   const pwRules = useMemo(() => {
-    const v = password || ''
+    const v = newPassword || ''
     return {
       len: v.length >= 8,
       upper: /[A-Z]/.test(v),
@@ -56,39 +59,49 @@ export default function Signup() {
       num: /[0-9]/.test(v),
       special: /[^A-Za-z0-9]/.test(v),
     }
-  }, [password])
+  }, [newPassword])
 
   const pwScore = useMemo(() => Object.values(pwRules).filter(Boolean).length, [pwRules])
   const pwStrength = useMemo(() => {
-    if (!password) return { label: '', color: 'bg-slate-200', w: 'w-0' }
+    if (!newPassword) return { label: '', color: 'bg-slate-200', w: 'w-0' }
     if (pwScore <= 2) return { label: 'WEAK', color: 'bg-red-500', w: 'w-1/4' }
     if (pwScore === 3) return { label: 'FAIR', color: 'bg-amber-500', w: 'w-2/4' }
     if (pwScore === 4) return { label: 'GOOD', color: 'bg-blue-600', w: 'w-3/4' }
     return { label: 'STRONG', color: 'bg-emerald-600', w: 'w-full' }
-  }, [password, pwScore])
+  }, [newPassword, pwScore])
 
-  const canSubmit = useMemo(() => email && password.length >= 8 && password.length <= 72, [email, password])
+  const passwordsMatch = useMemo(() => {
+    if (!confirmPassword) return true
+    return newPassword === confirmPassword
+  }, [newPassword, confirmPassword])
+
+  const canSubmit = useMemo(() => {
+    const base = email && newPassword.length >= 8 && newPassword.length <= 72
+    return Boolean(base && confirmPassword && passwordsMatch)
+  }, [email, newPassword, confirmPassword, passwordsMatch])
 
   const onSubmit = async (e) => {
     e.preventDefault()
     if (!canSubmit) return
     setLoading(true)
     setError('')
+    setSuccess('')
     try {
-      await api.post('/auth/signup', { email, password })
-      navigate('/login', { replace: true })
+      await api.post('/auth/reset-password', { email, new_password: newPassword })
+      setSuccess('Password updated. You can now login with your new password.')
+      setTimeout(() => navigate('/login', { replace: true }), 700)
     } catch (err) {
-      setError(err?.response?.data?.detail || 'Signup failed')
+      setError(err?.response?.data?.detail || 'Reset failed')
     } finally {
       setLoading(false)
     }
   }
 
   return (
-    <AuthShell title="Create Account" subtitle="Build your AI career identity in minutes.">
+    <AuthShell title="Reset Password" subtitle="Set a new password for your account.">
       <form onSubmit={onSubmit} className="space-y-4">
         <div>
-          <label className="text-xs text-slate-600">Institutional Email</label>
+          <label className="text-xs text-slate-600">Email</label>
           <input
             value={email}
             onChange={(e) => setEmail(e.target.value)}
@@ -97,32 +110,27 @@ export default function Signup() {
             placeholder="alex@university.edu"
           />
         </div>
+
         <div>
-          <label className="text-xs text-slate-600">Password</label>
+          <label className="text-xs text-slate-600">New password</label>
           <div className="relative mt-1">
             <input
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              type={showPassword ? 'text' : 'password'}
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+              type={showNewPassword ? 'text' : 'password'}
               className="w-full rounded-xl bg-white border border-slate-200 px-3 py-2 pr-11 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
               placeholder="8–72 characters"
               maxLength={72}
             />
             <button
               type="button"
-              onClick={() => setShowPassword((v) => !v)}
-              aria-label={showPassword ? 'Hide password' : 'Show password'}
+              onClick={() => setShowNewPassword((v) => !v)}
+              aria-label={showNewPassword ? 'Hide password' : 'Show password'}
               className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-700"
             >
-              {showPassword ? (
+              {showNewPassword ? (
                 <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5" aria-hidden="true">
-                  <path
-                    d="M3 3l18 18"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
+                  <path d="M3 3l18 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                   <path
                     d="M10.6 10.6a2 2 0 0 0 2.83 2.83"
                     stroke="currentColor"
@@ -189,14 +197,87 @@ export default function Signup() {
           </div>
         </div>
 
+        <div>
+          <label className="text-xs text-slate-600">Confirm new password</label>
+          <div className="relative mt-1">
+            <input
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              type={showConfirmPassword ? 'text' : 'password'}
+              className="w-full rounded-xl bg-white border border-slate-200 px-3 py-2 pr-11 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+              placeholder="Re-enter new password"
+              maxLength={72}
+            />
+            <button
+              type="button"
+              onClick={() => setShowConfirmPassword((v) => !v)}
+              aria-label={showConfirmPassword ? 'Hide password' : 'Show password'}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-700"
+            >
+              {showConfirmPassword ? (
+                <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5" aria-hidden="true">
+                  <path d="M3 3l18 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                  <path
+                    d="M10.6 10.6a2 2 0 0 0 2.83 2.83"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                  <path
+                    d="M9.88 5.09A10.94 10.94 0 0 1 12 5c5 0 9.27 3.11 11 7-0.52 1.16-1.27 2.23-2.2 3.16"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                  <path
+                    d="M6.23 6.23C4.24 7.58 2.77 9.53 2 12c1.73 3.89 6 7 10 7 1.55 0 3.03-0.3 4.38-0.84"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              ) : (
+                <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5" aria-hidden="true">
+                  <path
+                    d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                  <path
+                    d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              )}
+            </button>
+          </div>
+          {!passwordsMatch ? <div className="mt-1 text-xs text-red-600">Passwords do not match</div> : null}
+        </div>
+
         {error ? <div className="text-sm text-red-600">{error}</div> : null}
+        {success ? <div className="text-sm text-emerald-700">{success}</div> : null}
 
         <button
           disabled={!canSubmit || loading}
           className="w-full rounded-xl bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:hover:bg-blue-600 transition px-3 py-2 font-semibold text-white"
         >
-          {loading ? 'Creating…' : 'Create account'}
+          {loading ? 'Updating…' : 'Update password'}
         </button>
+
+        <div className="text-xs text-slate-600 text-center">
+          Remembered your password?{' '}
+          <Link to="/login" className="font-medium text-blue-600 hover:text-blue-700">
+            Back to login
+          </Link>
+        </div>
       </form>
     </AuthShell>
   )

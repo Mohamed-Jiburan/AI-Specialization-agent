@@ -2,11 +2,13 @@ import { motion } from 'framer-motion'
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import api from '../services/api'
+import SearchableGroupedSelect from '../components/SearchableGroupedSelect'
 
 export default function ProfileSetup() {
   const navigate = useNavigate()
   const [skillsText, setSkillsText] = useState('')
-  const [interestsText, setInterestsText] = useState('')
+  const [exploreItems, setExploreItems] = useState([])
+  const [exploreText, setExploreText] = useState('')
   const [goal, setGoal] = useState('ML Engineer')
   const [experienceLevel, setExperienceLevel] = useState('Beginner')
   const [experienceMode, setExperienceMode] = useState('manual')
@@ -39,7 +41,8 @@ export default function ProfileSetup() {
       }
     }
     run()
-  }, [goal])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const skills = useMemo(
     () =>
@@ -50,14 +53,45 @@ export default function ProfileSetup() {
     [skillsText]
   )
 
-  const interests = useMemo(
-    () =>
-      interestsText
-        .split(',')
-        .map((x) => x.trim())
-        .filter(Boolean),
-    [interestsText]
+  const interests = useMemo(() => (Array.isArray(exploreItems) ? exploreItems : []).filter(Boolean), [exploreItems])
+
+  const exploreSuggestions = useMemo(
+    () => [
+      { label: 'Generative AI', category: 'AI' },
+      { label: 'LLMs', category: 'AI' },
+      { label: 'NLP', category: 'AI' },
+      { label: 'Computer Vision', category: 'AI' },
+      { label: 'Deep Learning', category: 'AI' },
+      { label: 'MLOps', category: 'Cloud' },
+      { label: 'Data Engineering', category: 'Data' },
+      { label: 'Data Analytics', category: 'Data' },
+      { label: 'Cloud', category: 'Cloud' },
+      { label: 'DevOps', category: 'Cloud' },
+      { label: 'Cybersecurity', category: 'Security' },
+      { label: 'System Design', category: 'Software' },
+      { label: 'Frontend UI', category: 'Software' },
+      { label: 'Backend APIs', category: 'Software' },
+      { label: 'Mobile Development', category: 'Software' },
+    ],
+    []
   )
+
+  const addExploreItem = (raw) => {
+    const v = String(raw || '').trim()
+    if (!v) return
+    setExploreItems((prev) => {
+      const arr = Array.isArray(prev) ? prev : []
+      const norm = (s) => String(s || '').trim().toLowerCase()
+      const exists = arr.some((x) => norm(x) === norm(v))
+      if (exists) return arr
+      return [...arr, v]
+    })
+  }
+
+  const removeExploreItem = (raw) => {
+    const v = String(raw || '').trim().toLowerCase()
+    setExploreItems((prev) => (Array.isArray(prev) ? prev.filter((x) => String(x || '').trim().toLowerCase() !== v) : []))
+  }
 
   const liveAnalysisConfidence = useMemo(() => {
     if (skills.length === 0) return 0
@@ -225,17 +259,17 @@ export default function ProfileSetup() {
                   <div className="space-y-4">
                     <div>
                       <label className="text-xs font-medium text-slate-700">What is your primary career goal in AI?</label>
-                      <select
-                        value={goal}
-                        onChange={(e) => setGoal(e.target.value)}
-                        className="mt-2 w-full rounded-xl bg-white border border-slate-200 px-3 py-2 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-                      >
-                        {(careerOptions.length ? careerOptions : [{ id: 'loading', title: 'Loading…' }]).map((c) => (
-                          <option key={c.id} value={c.title}>
-                            {c.title}
-                          </option>
-                        ))}
-                      </select>
+                      <div className="mt-2">
+                        <SearchableGroupedSelect
+                          options={careerOptions.length ? careerOptions : [{ id: 'loading', title: 'Loading…', category: 'General' }]}
+                          value={goal}
+                          onChange={(v) => setGoal(v)}
+                          placeholder="Select your target role"
+                          getOptionLabel={(c) => c?.title}
+                          getOptionValue={(c) => c?.title}
+                          groupBy={(c) => c?.category || 'General'}
+                        />
+                      </div>
                       <div className="mt-2 text-xs text-slate-500">Try to be specific about role and scale.</div>
                     </div>
                   </div>
@@ -259,17 +293,84 @@ export default function ProfileSetup() {
                       </div>
 
                       <div>
-                        <label className="text-xs font-medium text-slate-700">Interests (comma-separated)</label>
-                        <input
-                          value={interestsText}
-                          onChange={(e) => setInterestsText(e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') e.preventDefault()
-                          }}
-                          className="mt-2 w-full rounded-xl bg-white border border-slate-200 px-3 py-2 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-                          placeholder="computer vision, nlp, mlops"
-                        />
-                        <div className="mt-2 text-xs text-slate-500">Detected: {interests.length}</div>
+                        <label className="text-xs font-medium text-slate-700">Areas you want to explore</label>
+                        <div className="mt-2 text-xs text-slate-500">
+                          Skills = what you can do today. Explore = what you want to learn next.
+                        </div>
+
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          {exploreSuggestions.map((s) => {
+                            const active = interests.some((x) => String(x || '').trim().toLowerCase() === String(s.label).toLowerCase())
+                            return (
+                              <button
+                                key={s.label}
+                                type="button"
+                                onClick={() => (active ? removeExploreItem(s.label) : addExploreItem(s.label))}
+                                className={
+                                  active
+                                    ? 'rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 px-3 py-1 text-xs font-semibold'
+                                    : 'rounded-full bg-white text-slate-700 border border-slate-200 px-3 py-1 text-xs font-semibold hover:bg-slate-50'
+                                }
+                                title={s.category}
+                              >
+                                {s.label}
+                              </button>
+                            )
+                          })}
+                        </div>
+
+                        <div className="mt-3 rounded-xl bg-white border border-slate-200 p-3">
+                          <div className="flex items-center gap-2">
+                            <input
+                              value={exploreText}
+                              onChange={(e) => setExploreText(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                  e.preventDefault()
+                                  addExploreItem(exploreText)
+                                  setExploreText('')
+                                }
+                              }}
+                              className="flex-1 rounded-lg bg-slate-50 border border-slate-200 px-3 py-2 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                              placeholder="Add a custom topic (press Enter)"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => {
+                                addExploreItem(exploreText)
+                                setExploreText('')
+                              }}
+                              className="h-10 px-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold"
+                            >
+                              Add
+                            </button>
+                          </div>
+
+                          {interests.length ? (
+                            <div className="mt-3 flex flex-wrap gap-2">
+                              {interests.map((it) => (
+                                <span
+                                  key={it}
+                                  className="inline-flex items-center gap-2 rounded-full bg-slate-100 text-slate-800 px-3 py-1 text-xs font-semibold"
+                                >
+                                  {it}
+                                  <button
+                                    type="button"
+                                    onClick={() => removeExploreItem(it)}
+                                    className="text-slate-500 hover:text-slate-800"
+                                    aria-label={`Remove ${it}`}
+                                  >
+                                    ×
+                                  </button>
+                                </span>
+                              ))}
+                            </div>
+                          ) : (
+                            <div className="mt-3 text-xs text-slate-500">Pick a few chips above, or add your own.</div>
+                          )}
+                        </div>
+
+                        <div className="mt-2 text-xs text-slate-500">Selected: {interests.length}</div>
                       </div>
                     </div>
 

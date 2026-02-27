@@ -11,7 +11,7 @@ from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 
-from .models import LoginRequest, SignupRequest, TokenResponse, UserPublic
+from .models import LoginRequest, ResetPasswordRequest, SignupRequest, TokenResponse, UserPublic
 from .utils import create_jwt, env
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -91,6 +91,19 @@ def _init_db() -> None:
             )
             """
         )
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def _set_user_password_by_email(*, email: str, new_password: str) -> None:
+    conn = _get_conn()
+    try:
+        row = conn.execute("SELECT id FROM users WHERE email = ?", (email.lower(),)).fetchone()
+        if row is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+        password_hash = _hash_password(new_password)
+        conn.execute("UPDATE users SET password_hash = ? WHERE id = ?", (password_hash, int(row["id"])))
         conn.commit()
     finally:
         conn.close()
@@ -378,6 +391,12 @@ def login(payload: LoginRequest) -> TokenResponse:
         expires_minutes=_jwt_expires_minutes(),
     )
     return TokenResponse(access_token=token)
+
+
+@router.post("/reset-password")
+def reset_password(payload: ResetPasswordRequest) -> dict:
+    _set_user_password_by_email(email=str(payload.email), new_password=str(payload.new_password))
+    return {"ok": True}
 
 
 def get_current_user(token: str = Depends(_oauth2_scheme)) -> UserPublic:

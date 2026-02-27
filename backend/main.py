@@ -62,7 +62,7 @@ def require_admin(user: UserPublic = Depends(get_current_user)) -> UserPublic:
 
 @app.get("/careers", response_model=list[CareerOption])
 def careers() -> list[CareerOption]:
-    return [CareerOption(id=c.id, title=c.title, required_skills=c.required_skills) for c in CAREERS]
+    return [CareerOption(id=c.id, title=c.title, category=getattr(c, "category", "General"), required_skills=c.required_skills) for c in CAREERS]
 
 
 @app.post("/analyze", response_model=AnalysisResponse)

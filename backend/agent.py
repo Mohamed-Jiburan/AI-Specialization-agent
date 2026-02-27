@@ -18,6 +18,7 @@ from .models import (
 class CareerSpec:
     id: str
     title: str
+    category: str
     required_skills: List[str]
     growth: float
     salary: float
@@ -29,6 +30,7 @@ CAREERS: List[CareerSpec] = [
     CareerSpec(
         id="ml_engineer",
         title="ML Engineer",
+        category="AI",
         required_skills=["python", "ml", "numpy", "pandas", "scikit-learn", "sql", "git", "docker"],
         growth=86,
         salary=82,
@@ -38,6 +40,7 @@ CAREERS: List[CareerSpec] = [
     CareerSpec(
         id="data_scientist",
         title="Data Scientist",
+        category="Data",
         required_skills=["python", "statistics", "pandas", "sql", "ml", "visualization", "experimentation"],
         growth=84,
         salary=80,
@@ -47,6 +50,7 @@ CAREERS: List[CareerSpec] = [
     CareerSpec(
         id="data_engineer",
         title="Data Engineer",
+        category="Data",
         required_skills=["sql", "python", "etl", "spark", "data_warehousing", "cloud", "airflow"],
         growth=78,
         salary=76,
@@ -56,6 +60,7 @@ CAREERS: List[CareerSpec] = [
     CareerSpec(
         id="mlops_engineer",
         title="MLOps Engineer",
+        category="Cloud",
         required_skills=["python", "ml", "docker", "kubernetes", "ci/cd", "cloud", "monitoring"],
         growth=82,
         salary=84,
@@ -65,11 +70,102 @@ CAREERS: List[CareerSpec] = [
     CareerSpec(
         id="nlp_engineer",
         title="NLP Engineer",
+        category="AI",
         required_skills=["python", "nlp", "transformers", "deep_learning", "pytorch", "data_processing"],
         growth=88,
         salary=85,
         stability=66,
         automation_risk=38,
+    ),
+    CareerSpec(
+        id="software_engineer",
+        title="Software Engineer",
+        category="Software",
+        required_skills=["programming", "data_structures", "algorithms", "git", "testing", "apis", "databases"],
+        growth=76,
+        salary=78,
+        stability=82,
+        automation_risk=26,
+    ),
+    CareerSpec(
+        id="backend_developer",
+        title="Backend Developer",
+        category="Software",
+        required_skills=["python", "java", "node", "apis", "sql", "databases", "auth", "testing"],
+        growth=74,
+        salary=76,
+        stability=82,
+        automation_risk=24,
+    ),
+    CareerSpec(
+        id="frontend_developer",
+        title="Frontend Developer",
+        category="Software",
+        required_skills=["javascript", "react", "html", "css", "ui", "apis", "testing"],
+        growth=72,
+        salary=70,
+        stability=74,
+        automation_risk=32,
+    ),
+    CareerSpec(
+        id="full_stack_developer",
+        title="Full Stack Developer",
+        category="Software",
+        required_skills=["javascript", "react", "apis", "sql", "databases", "auth", "deployment", "git"],
+        growth=75,
+        salary=74,
+        stability=78,
+        automation_risk=30,
+    ),
+    CareerSpec(
+        id="devops_engineer",
+        title="DevOps Engineer",
+        category="Cloud",
+        required_skills=["linux", "docker", "kubernetes", "ci/cd", "cloud", "terraform", "monitoring"],
+        growth=79,
+        salary=82,
+        stability=80,
+        automation_risk=18,
+    ),
+    CareerSpec(
+        id="cloud_engineer",
+        title="Cloud Engineer",
+        category="Cloud",
+        required_skills=["cloud", "networking", "security", "linux", "terraform", "containers", "monitoring"],
+        growth=78,
+        salary=80,
+        stability=80,
+        automation_risk=20,
+    ),
+    CareerSpec(
+        id="data_analyst",
+        title="Data Analyst",
+        category="Data",
+        required_skills=["sql", "excel", "statistics", "dashboards", "visualization", "business"],
+        growth=66,
+        salary=62,
+        stability=76,
+        automation_risk=42,
+    ),
+    CareerSpec(
+        id="cybersecurity_engineer",
+        title="Cybersecurity Engineer",
+        category="Security",
+        required_skills=["networking", "security", "linux", "threat_modeling", "incident_response", "scripting"],
+        growth=82,
+        salary=78,
+        stability=86,
+        automation_risk=14,
+    ),
+    CareerSpec(
+        id="mobile_app_developer",
+        title="Mobile App Developer",
+        category="Software",
+        required_skills=["android", "ios", "kotlin", "swift", "ui", "apis", "testing"],
+        growth=70,
+        salary=68,
+        stability=72,
+        automation_risk=30,
     ),
 ]
 
@@ -99,8 +195,6 @@ def _risk_fit(risk_tolerance: int, automation_risk: float) -> float:
 
 
 def _salary_fit(salary_preference: int, salary_score: float) -> float:
-    # salary_preference: 0..100 (how much they care). If they care a lot, match salary more strongly.
-    # Convert to a blend: baseline fit is salary_score; low preference reduces impact.
     alpha = salary_preference / 100.0
     return (salary_score * alpha) + (60.0 * (1.0 - alpha))
 
@@ -172,7 +266,6 @@ def analyze_profile(profile: ProfileInput) -> AnalysisResponse:
     matches.sort(key=lambda m: m.breakdown.match_percent, reverse=True)
     top = matches[:5]
 
-    # Confidence: based on separation and completeness
     if len(top) >= 2:
         spread = max(0.0, min(30.0, top[0].breakdown.match_percent - top[1].breakdown.match_percent))
     else:
